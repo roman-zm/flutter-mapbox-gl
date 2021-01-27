@@ -37,3 +37,5 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
   end
 end
+
+pod 'MapboxAnnotationExtension', :git => 'https://github.com/roman-zm/mapbox-annotation-extension.git', :commit => '38f4173c7b7ccf004eaffdb7804d4666068f5800'

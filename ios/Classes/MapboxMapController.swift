@@ -511,7 +511,7 @@ class MapboxMapController: NSObject, FlutterPlatformView, MGLMapViewDelegate, Ma
                 result(FlutterError(code: "duplicateSource", message: "Source with imageSourceId \(imageSourceId) already exists", details: "Can't add duplicate source with imageSourceId: \(imageSourceId)" ))
                 return
             }
-            
+
             let source = MGLImageSource(identifier: imageSourceId, coordinateQuad: quad, image: image)
             self.mapView.style?.addSource(source)
             
@@ -537,7 +537,7 @@ class MapboxMapController: NSObject, FlutterPlatformView, MGLMapViewDelegate, Ma
                 result(FlutterError(code: "noSuchSource", message: "No source found with imageSourceId \(imageSourceId)", details: "Can't add add layer for imageSourceId \(imageLayerId), as the source does not exist." ))
                 return
             }
-            
+
             let layer = MGLRasterStyleLayer(identifier: imageLayerId, source: source)
             self.mapView.style?.addLayer(layer)
             result(nil)
@@ -546,7 +546,7 @@ class MapboxMapController: NSObject, FlutterPlatformView, MGLMapViewDelegate, Ma
             guard let imageLayerId = arguments["imageLayerId"] as? String else { return }
             guard let imageSourceId = arguments["imageSourceId"] as? String else { return }
             guard let belowLayerId = arguments["belowLayerId"] as? String else { return }
-            
+
             //Check for duplicateLayer error
             if (self.mapView.style?.layer(withIdentifier: imageLayerId)) != nil {
                 result(FlutterError(code: "duplicateLayer", message: "Layer already exists", details: "Can't add duplicate layer with imageLayerId: \(imageLayerId)" ))
@@ -693,6 +693,35 @@ class MapboxMapController: NSObject, FlutterPlatformView, MGLMapViewDelegate, Ma
     /*
      *  MGLMapViewDelegate
      */
+    fileprivate func initClustering(_ style: MGLStyle) {
+
+
+        let symbolLayer = symbolAnnotationController?.layer as? MGLSymbolStyleLayer
+        symbolLayer?.predicate = NSPredicate(format: "cluster != YES")
+
+        let circlesLayer = MGLCircleStyleLayer(identifier: "circle_clusters", source: symbolAnnotationController!.source)
+        circlesLayer.circleStrokeWidth = NSExpression(forConstantValue: 2)
+        circlesLayer.circleRadius = NSExpression(forConstantValue: 15)
+        let color = UIColor(hexString: "#3C4444")
+        circlesLayer.circleColor = NSExpression(forConstantValue: color)
+        circlesLayer.predicate = NSPredicate(format: "cluster == YES")
+        circlesLayer.circleStrokeColor = NSExpression(forConstantValue: UIColor.white)
+        circlesLayer.circleOpacity = NSExpression(forConstantValue: 0.6)
+        circlesLayer.circleStrokeOpacity = NSExpression(forConstantValue: 0.6)
+        style.addLayer(circlesLayer)
+
+        let numbersLayer = MGLSymbolStyleLayer(identifier: "clustered_numbers", source: symbolAnnotationController!.source)
+        numbersLayer.textColor = NSExpression(forConstantValue: UIColor.white)
+        numbersLayer.textFontSize = NSExpression(forConstantValue: NSNumber(14))
+        numbersLayer.textFontNames = NSExpression(format: "{'DIN Pro Bold'}")
+        numbersLayer.iconAllowsOverlap = NSExpression(forConstantValue: true)
+        numbersLayer.text = NSExpression(format: "CAST(point_count, 'NSString')")
+
+        numbersLayer.predicate = NSPredicate(format: "cluster == YES")
+        style.addLayer(numbersLayer)
+
+    }
+
     func mapView(_ mapView: MGLMapView, didFinishLoading style: MGLStyle) {
         isMapReady = true
         updateMyLocationEnabled()
@@ -718,13 +747,15 @@ class MapboxMapController: NSObject, FlutterPlatformView, MGLMapViewDelegate, Ma
                 circleAnnotationController!.annotationsInteractionEnabled = true
                 circleAnnotationController?.delegate = self
             case "AnnotationType.symbol":
-                symbolAnnotationController = MGLSymbolAnnotationController(mapView: self.mapView)
+                symbolAnnotationController = MGLSymbolAnnotationController(mapView: self.mapView, options: [MGLShapeSourceOption.clustered: true, MGLShapeSourceOption.clusterRadius: 20.0])
                 symbolAnnotationController!.annotationsInteractionEnabled = true
                 symbolAnnotationController?.delegate = self
             default:
-                print("Unknown annotation type: \(annotationType), must be either 'fill', 'line', 'circle' or 'symbol'")  
+                print("Unknown annotation type: \(annotationType), must be either 'fill', 'line', 'circle' or 'symbol'")
             }
         }
+
+        initClustering(style)
 
         mapReadyResult?(nil)
         if let channel = channel {
@@ -870,8 +901,8 @@ class MapboxMapController: NSObject, FlutterPlatformView, MGLMapViewDelegate, Ma
             // We are assuming that the style will be loaded from an asset here.
             let assetPath = registrar.lookupKey(forAsset: styleString)
             mapView.styleURL = URL(string: assetPath, relativeTo: Bundle.main.resourceURL)
-            
-            
+
+
         } else {
             mapView.styleURL = URL(string: styleString)
         }
