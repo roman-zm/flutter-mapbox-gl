@@ -61,6 +61,7 @@ target 'Runner' do
 
   # Keep pod path relative so it can be checked into Podfile.lock.
   pod 'Flutter', :path => 'Flutter'
+  pod 'MapboxAnnotationExtension', :git => 'https://github.com/roman-zm/mapbox-annotation-extension.git', :commit => '38f4173c7b7ccf004eaffdb7804d4666068f5800'
 
   # Plugin Pods
 

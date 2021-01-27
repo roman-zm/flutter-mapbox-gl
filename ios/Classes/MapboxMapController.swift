@@ -614,6 +614,35 @@ class MapboxMapController: NSObject, FlutterPlatformView, MGLMapViewDelegate, Ma
     /*
      *  MGLMapViewDelegate
      */
+    fileprivate func initClustering(_ style: MGLStyle) {
+        
+        
+        let symbolLayer = symbolAnnotationController?.layer as? MGLSymbolStyleLayer
+        symbolLayer?.predicate = NSPredicate(format: "cluster != YES")
+        
+        let circlesLayer = MGLCircleStyleLayer(identifier: "circle_clusters", source: symbolAnnotationController!.source)
+        circlesLayer.circleStrokeWidth = NSExpression(forConstantValue: 2)
+        circlesLayer.circleRadius = NSExpression(forConstantValue: 15)
+        let color = UIColor(hexString: "#3C4444")
+        circlesLayer.circleColor = NSExpression(forConstantValue: color)
+        circlesLayer.predicate = NSPredicate(format: "cluster == YES")
+        circlesLayer.circleStrokeColor = NSExpression(forConstantValue: UIColor.white)
+        circlesLayer.circleOpacity = NSExpression(forConstantValue: 0.6)
+        circlesLayer.circleStrokeOpacity = NSExpression(forConstantValue: 0.6)
+        style.addLayer(circlesLayer)
+        
+        let numbersLayer = MGLSymbolStyleLayer(identifier: "clustered_numbers", source: symbolAnnotationController!.source)
+        numbersLayer.textColor = NSExpression(forConstantValue: UIColor.white)
+        numbersLayer.textFontSize = NSExpression(forConstantValue: NSNumber(14))
+        numbersLayer.textFontNames = NSExpression(format: "{'DIN Pro Bold'}")
+        numbersLayer.iconAllowsOverlap = NSExpression(forConstantValue: true)
+        numbersLayer.text = NSExpression(format: "CAST(point_count, 'NSString')")
+        
+        numbersLayer.predicate = NSPredicate(format: "cluster == YES")
+        style.addLayer(numbersLayer)
+        
+    }
+    
     func mapView(_ mapView: MGLMapView, didFinishLoading style: MGLStyle) {
         isMapReady = true
         updateMyLocationEnabled()
@@ -627,8 +656,8 @@ class MapboxMapController: NSObject, FlutterPlatformView, MGLMapViewDelegate, Ma
         lineAnnotationController = MGLLineAnnotationController(mapView: self.mapView)
         lineAnnotationController!.annotationsInteractionEnabled = true
         lineAnnotationController?.delegate = self
-
-        symbolAnnotationController = MGLSymbolAnnotationController(mapView: self.mapView)
+        
+        symbolAnnotationController = MGLSymbolAnnotationController(mapView: self.mapView, options: [MGLShapeSourceOption.clustered: true, MGLShapeSourceOption.clusterRadius: 20.0])
         symbolAnnotationController!.annotationsInteractionEnabled = true
         symbolAnnotationController?.delegate = self
         
@@ -639,6 +668,8 @@ class MapboxMapController: NSObject, FlutterPlatformView, MGLMapViewDelegate, Ma
         fillAnnotationController = MGLPolygonAnnotationController(mapView: self.mapView)
         fillAnnotationController!.annotationsInteractionEnabled = true
         fillAnnotationController?.delegate = self
+        
+        initClustering(style)
         
         mapReadyResult?(nil)
         if let channel = channel {
