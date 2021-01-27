@@ -14,18 +14,19 @@ import android.content.res.AssetFileDescriptor;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
 import android.graphics.PointF;
 import android.graphics.RectF;
 import android.location.Location;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.DisplayMetrics;
-import androidx.annotation.NonNull;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 
 import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -39,46 +40,54 @@ import com.mapbox.geojson.Feature;
 import com.mapbox.mapboxsdk.Mapbox;
 import com.mapbox.mapboxsdk.camera.CameraPosition;
 import com.mapbox.mapboxsdk.camera.CameraUpdate;
-
 import com.mapbox.mapboxsdk.geometry.LatLng;
 import com.mapbox.mapboxsdk.geometry.LatLngBounds;
 import com.mapbox.mapboxsdk.geometry.LatLngQuad;
 import com.mapbox.mapboxsdk.geometry.VisibleRegion;
 import com.mapbox.mapboxsdk.location.LocationComponent;
 import com.mapbox.mapboxsdk.location.LocationComponentOptions;
-import com.mapbox.mapboxsdk.location.LocationComponentActivationOptions;
 import com.mapbox.mapboxsdk.location.OnCameraTrackingChangedListener;
 import com.mapbox.mapboxsdk.location.modes.CameraMode;
 import com.mapbox.mapboxsdk.location.modes.RenderMode;
 import com.mapbox.mapboxsdk.maps.MapView;
 import com.mapbox.mapboxsdk.maps.MapboxMap;
 import com.mapbox.mapboxsdk.maps.MapboxMapOptions;
-import com.mapbox.mapboxsdk.maps.Projection;
-import com.mapbox.mapboxsdk.offline.OfflineManager;
 import com.mapbox.mapboxsdk.maps.OnMapReadyCallback;
 import com.mapbox.mapboxsdk.maps.Style;
+import com.mapbox.mapboxsdk.offline.OfflineManager;
 import com.mapbox.mapboxsdk.plugins.annotation.Annotation;
 import com.mapbox.mapboxsdk.plugins.annotation.Circle;
 import com.mapbox.mapboxsdk.plugins.annotation.CircleManager;
 import com.mapbox.mapboxsdk.plugins.annotation.Fill;
 import com.mapbox.mapboxsdk.plugins.annotation.FillManager;
+import com.mapbox.mapboxsdk.plugins.annotation.Line;
+import com.mapbox.mapboxsdk.plugins.annotation.LineManager;
 import com.mapbox.mapboxsdk.plugins.annotation.OnAnnotationClickListener;
 import com.mapbox.mapboxsdk.plugins.annotation.Symbol;
 import com.mapbox.mapboxsdk.plugins.annotation.SymbolManager;
-import com.mapbox.mapboxsdk.plugins.annotation.Line;
-import com.mapbox.mapboxsdk.plugins.annotation.LineManager;
-import com.mapbox.geojson.Feature;
 import com.mapbox.mapboxsdk.plugins.annotation.SymbolOptions;
+import com.mapbox.mapboxsdk.plugins.localization.LocalizationPlugin;
 import com.mapbox.mapboxsdk.style.expressions.Expression;
+import com.mapbox.mapboxsdk.style.layers.CircleLayer;
+import com.mapbox.mapboxsdk.style.layers.RasterLayer;
+import com.mapbox.mapboxsdk.style.layers.SymbolLayer;
+import com.mapbox.mapboxsdk.style.sources.GeoJsonOptions;
+import com.mapbox.mapboxsdk.style.sources.ImageSource;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.PluginRegistry;
 import io.flutter.plugin.platform.PlatformView;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.mapbox.mapboxgl.MapboxMapsPlugin.CREATED;
 import static com.mapbox.mapboxgl.MapboxMapsPlugin.DESTROYED;
@@ -86,10 +95,21 @@ import static com.mapbox.mapboxgl.MapboxMapsPlugin.PAUSED;
 import static com.mapbox.mapboxgl.MapboxMapsPlugin.RESUMED;
 import static com.mapbox.mapboxgl.MapboxMapsPlugin.STARTED;
 import static com.mapbox.mapboxgl.MapboxMapsPlugin.STOPPED;
-
-import com.mapbox.mapboxsdk.plugins.localization.LocalizationPlugin;
-import com.mapbox.mapboxsdk.style.layers.RasterLayer;
-import com.mapbox.mapboxsdk.style.sources.ImageSource;
+import static com.mapbox.mapboxsdk.style.expressions.Expression.all;
+import static com.mapbox.mapboxsdk.style.expressions.Expression.get;
+import static com.mapbox.mapboxsdk.style.expressions.Expression.has;
+import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.circleColor;
+import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.circleOpacity;
+import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.circleRadius;
+import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.circleStrokeColor;
+import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.circleStrokeOpacity;
+import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.circleStrokeWidth;
+import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.textAllowOverlap;
+import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.textColor;
+import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.textField;
+import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.textFont;
+import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.textIgnorePlacement;
+import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.textSize;
 
 /**
  * Controller of a single MapboxMaps MapView instance.
@@ -415,7 +435,39 @@ final class MapboxMapController
 
   private void enableSymbolManager(@NonNull Style style) {
     if (symbolManager == null) {
-      symbolManager = new SymbolManager(mapView, mapboxMap, style);
+      GeoJsonOptions geoJsonOptions = new GeoJsonOptions()
+              .withCluster(true)
+              .withClusterRadius(20);
+      symbolManager = new SymbolManager(mapView, mapboxMap, style, null, geoJsonOptions);
+      SymbolLayer layer = style.getLayerAs(symbolManager.getLayerId());
+
+      int color = Color.parseColor("#3C4444");
+      int strokeColor = ContextCompat.getColor(context, android.R.color.white);
+
+      CircleLayer circles = new CircleLayer("cluster-circle", layer.getSourceId());
+      circles.setProperties(
+              circleColor(color),
+              circleRadius(15f),
+              circleStrokeWidth(2f),
+              circleStrokeColor(strokeColor),
+              circleOpacity(0.6f),
+              circleStrokeOpacity(0.6f)
+      );
+      circles.setFilter(all(has("point_count")));
+      style.addLayer(circles);
+
+      String[] fonts = new String[] { "DIN Pro Bold" };
+      SymbolLayer count = new SymbolLayer("count", layer.getSourceId());
+      count.setProperties(
+              textField(Expression.toString(get("point_count"))),
+              textSize(14f),
+              textColor(Color.WHITE),
+              textIgnorePlacement(true),
+              textAllowOverlap(true),
+              textFont(fonts)
+      );
+      style.addLayer(count);
+
       symbolManager.setIconAllowOverlap(true);
       symbolManager.setIconIgnorePlacement(true);
       symbolManager.setTextAllowOverlap(true);
