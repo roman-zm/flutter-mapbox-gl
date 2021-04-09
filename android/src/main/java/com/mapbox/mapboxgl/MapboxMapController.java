@@ -99,12 +99,6 @@ import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.platform.PlatformView;
 
-import static com.mapbox.mapboxgl.MapboxMapsPlugin.CREATED;
-import static com.mapbox.mapboxgl.MapboxMapsPlugin.DESTROYED;
-import static com.mapbox.mapboxgl.MapboxMapsPlugin.PAUSED;
-import static com.mapbox.mapboxgl.MapboxMapsPlugin.RESUMED;
-import static com.mapbox.mapboxgl.MapboxMapsPlugin.STARTED;
-import static com.mapbox.mapboxgl.MapboxMapsPlugin.STOPPED;
 import static com.mapbox.mapboxsdk.style.expressions.Expression.all;
 import static com.mapbox.mapboxsdk.style.expressions.Expression.get;
 import static com.mapbox.mapboxsdk.style.expressions.Expression.has;
